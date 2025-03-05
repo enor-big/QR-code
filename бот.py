@@ -12,7 +12,7 @@ import openai
 import requests
 import asyncio
 
-API_TOKEN = '8035098218:AAFk4b8XB_n2ghEUzUsQjl_MgWOf6APug0E'
+API_TOKEN = 'Ваш тг бот API'
 OPENAI_API_KEY = 'YOUR_OPENAI_API_KEY'
 
 default_bot_properties = aiogram.client.bot.DefaultBotProperties(parse_mode=ParseMode.HTML)
