@@ -20,12 +20,12 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Telegram Bot Token
-TOKEN = "Добавьте ваш token"
+TOKEN = "8035098218:AAFk4b8XB_n2ghEUzUsQjl_MgWOf6APug0E"
 
 # API Keys
 API_URL = "https://api-key.fusionbrain.ai/"
-API_KEY = "Добавьте ваш API_KEY"
-SECRET_KEY = "Добавьте ваш secret_key"
+API_KEY = "6AAC667DF487820133143F17037CBB54"
+SECRET_KEY = "7E55DE7139607DED7C9CB8FF604A3D25"
 
 # Инициализация бота и диспетчера
 bot = Bot(token=TOKEN)
@@ -137,22 +137,15 @@ def generate_qr_code(data, size=300):
     return qr_img
 
 # Функция наложения QR-кода на изображение
-def overlay_qr_on_image(background, qr_code, full_image=False, alpha=160):
-    if full_image:
-        # Если QR-код должен занять всю картинку
-        qr_full = qr_code.resize(background.size, Image.LANCZOS)
-        qr_full.putalpha(alpha)  # Установка прозрачности
-        return Image.alpha_composite(background.convert("RGBA"), qr_full)
-    else:
-        # Если QR-код должен быть водяным знаком
-        bg_width, bg_height = background.size
-        qr_width, qr_height = qr_code.size
-        qr_overlay = qr_code.copy()
-        qr_overlay.putalpha(alpha)  # Уровень прозрачности
-        position = ((bg_width - qr_width) // 2, (bg_height - qr_height) // 2)
-        overlay = Image.new("RGBA", background.size, (0, 0, 0, 0))
-        overlay.paste(qr_overlay, position, qr_overlay)
-        return Image.alpha_composite(background.convert("RGBA"), overlay)
+def overlay_qr_on_image(background, qr_code, alpha=160):
+    bg_width, bg_height = background.size
+    qr_width, qr_height = qr_code.size
+    qr_overlay = qr_code.copy()
+    qr_overlay.putalpha(alpha)  # Уровень прозрачности
+    position = ((bg_width - qr_width) // 2, (bg_height - qr_height) // 2)
+    overlay = Image.new("RGBA", background.size, (0, 0, 0, 0))
+    overlay.paste(qr_overlay, position, qr_overlay)
+    return Image.alpha_composite(background.convert("RGBA"), overlay)
 
 # Хранение истории запросов
 class UserHistory:
@@ -160,11 +153,9 @@ class UserHistory:
         self.history = {}
 
     def save_request(self, user_id, data):
-        # Преобразуем данные в JSON-строку перед сохранением
         self.history[str(user_id)] = json.dumps(data, ensure_ascii=False)
 
     def get_last_request(self, user_id):
-        # Извлекаем JSON-строку и преобразуем её обратно в словарь
         data_str = self.history.get(str(user_id))
         return json.loads(data_str) if data_str else None
 
@@ -173,16 +164,14 @@ user_history = UserHistory()
 # FSM (машина состояний)
 class Form(StatesGroup):
     qr_link = State()
-    qr_type = State()  # Новое состояние для выбора типа QR-кода
     prompt = State()
     style = State()
-    transparency = State()  # Новое состояние для выбора прозрачности
+    transparency = State()
 
 # Клавиатура выбора типа QR-кода
 def qr_type_keyboard():
     buttons = [
-        [InlineKeyboardButton(text="📝 QR-код как водяной знак", callback_data="qr_watermark")],
-        [InlineKeyboardButton(text="🖼️ QR-код на всю картинку", callback_data="qr_full_image")]
+        [InlineKeyboardButton(text="📝 QR-код как водяной знак", callback_data="qr_watermark")]
     ]
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
@@ -212,11 +201,11 @@ def transparency_keyboard():
     ]
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
-# Клавиатура для повторной генерации
-def regenerate_keyboard():
+# Клавиатура для продолжения
+def continue_keyboard():
     buttons = [
-        [InlineKeyboardButton(text="🔄 Повторить с теми же параметрами", callback_data="regenerate")],
-        [InlineKeyboardButton(text="📝 Изменить параметры", callback_data="change_parameters")]
+        [InlineKeyboardButton(text="✅ Да", callback_data="continue_yes")],
+        [InlineKeyboardButton(text="❌ Нет", callback_data="continue_no")]
     ]
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
@@ -234,21 +223,8 @@ async def get_qr_link(message: Message, state: FSMContext):
         return
 
     await state.update_data(qr_link=message.text.strip())
-    await state.set_state(Form.qr_type)
-    await message.answer("Выберите, как должен быть размещен QR-код:", reply_markup=qr_type_keyboard())
-
-# Обработка выбора типа QR-кода
-@router.callback_query(lambda c: c.data in ["qr_watermark", "qr_full_image"])
-async def handle_qr_type(callback: types.CallbackQuery, state: FSMContext):
-    qr_type_mapping = {
-        "qr_watermark": False,
-        "qr_full_image": True
-    }
-    selected_qr_type = qr_type_mapping.get(callback.data, False)
-    await state.update_data(qr_type=selected_qr_type)
     await state.set_state(Form.prompt)
-    await callback.message.answer("✅ Тип QR-кода выбран. Выберите тип промта:", reply_markup=prompt_choice_keyboard())
-    await callback.answer()
+    await message.answer("✅ Тип QR-кода выбран. Выберите тип промта:", reply_markup=prompt_choice_keyboard())
 
 # Обработка выбора типа промта
 @router.callback_query(lambda c: c.data in ["custom_prompt", "random_prompt"])
@@ -286,37 +262,16 @@ async def select_style(callback: types.CallbackQuery, state: FSMContext):
     await callback.answer()
 
 # Обработка выбора прозрачности
-# Словарь для отслеживания обработанных callback'ов
-processed_callbacks = {}
-
-
 @router.callback_query(lambda c: c.data.startswith("transparency_"))
 async def handle_transparency(callback: types.CallbackQuery, state: FSMContext):
-    try:
-        # Проверяем, был ли уже дан ответ на этот callback
-        if callback.id in processed_callbacks:
-            logger.info(f"Callback с ID {callback.id} уже был обработан.")
-            return
-
-        # Отмечаем callback как обработанный
-        processed_callbacks[callback.id] = time.time()
-
-        transparency_mapping = {
-            "transparency_160": 160,
-            "transparency_255": 255
-        }
-        selected_transparency = transparency_mapping.get(callback.data, 160)
-        await state.update_data(transparency=selected_transparency)
-
-        # Ответ на callback
-        await callback.answer(f"✅ Выбран уровень прозрачности: {selected_transparency}")
-
-        # Начинаем генерацию изображения
-        await generate_image(callback.message, state)
-
-    except aiogram.exceptions.TelegramBadRequest as e:
-        logger.error(f"Ошибка при ответе на callback: {e}")
-        await callback.message.answer("❌ Произошла ошибка. Попробуйте снова.")
+    transparency_mapping = {
+        "transparency_160": 160,
+        "transparency_255": 255
+    }
+    selected_transparency = transparency_mapping.get(callback.data, 160)
+    await state.update_data(transparency=selected_transparency)
+    await callback.answer(f"✅ Выбран уровень прозрачности: {selected_transparency}")
+    await generate_image(callback.message, state)
 
 # Генерация изображения
 async def generate_image(message: Message, state: FSMContext):
@@ -324,16 +279,13 @@ async def generate_image(message: Message, state: FSMContext):
     qr_link = data.get("qr_link")
     prompt = data.get("prompt")
     style = data.get("style")
-    qr_type = data.get("qr_type", False)  # По умолчанию QR-код как watermark
-    transparency = data.get("transparency", 160)  # По умолчанию прозрачность 160
+    transparency = data.get("transparency", 160)
 
     if not (qr_link and prompt and style and transparency is not None):
         logger.error(f"Недостаточно данных для генерации: {data}")
         await message.answer("❌ Произошла ошибка. Попробуйте снова.")
-        await state.clear()
         return
 
-    # Отправляем временное сообщение пользователю
     temporary_message = await message.answer("⏳ Идет генерация изображения... Это может занять некоторое время.")
 
     try:
@@ -341,94 +293,53 @@ async def generate_image(message: Message, state: FSMContext):
         model_id = api.get_model()
         if model_id is None:
             await message.answer("❌ Ошибка: не удалось получить модель для генерации.")
-            await state.clear()
             return
 
         uuid = api.generate(prompt, model_id, style)
         if uuid is None:
             await message.answer("❌ Ошибка генерации.")
-            await state.clear()
             return
 
         images = api.check_generation(uuid)
         if not images:
             await message.answer("❌ Не удалось сгенерировать изображение.")
-            await state.clear()
             return
 
-        # Обработка изображения
         background_img = api.decode_image(images[0])
         qr_code_img = generate_qr_code(qr_link)
-        final_img = overlay_qr_on_image(background_img, qr_code_img, full_image=qr_type, alpha=transparency)
+        final_img = overlay_qr_on_image(background_img, qr_code_img, alpha=transparency)
 
-        # Сохраняем результат
         file_path = f"final_result_{message.from_user.id}.png"
         final_img.save(file_path)
 
-        # Сохраняем текущий запрос в историю
         user_history.save_request(message.from_user.id, data)
+        logger.info(f"Сохранены данные для пользователя {message.from_user.id}: {data}")
 
-        # Удаляем временное сообщение
         await temporary_message.delete()
-
-        # Отправляем результат пользователю
         await message.answer_photo(types.FSInputFile(file_path), caption="✅ Ваше изображение готово!")
-        await message.answer("Что хотите сделать дальше?", reply_markup=regenerate_keyboard())
+        await message.answer("Желаете продолжить?", reply_markup=continue_keyboard())
 
     except Exception as e:
         logger.error(f"Ошибка при генерации изображения: {e}")
         await message.answer("❌ Произошла ошибка при генерации изображения. Попробуйте снова.")
 
     finally:
-        # Очищаем состояние FSM
         await state.clear()
 
-# Обработка кнопки "Повторить с теми же параметрами"
-@router.callback_query(lambda c: c.data == "regenerate")
-async def regenerate_image(callback: types.CallbackQuery, state: FSMContext):
-    try:
-        # Проверяем, был ли уже дан ответ на этот callback
-        if processed_callbacks.get(callback.id):
-            logger.info(f"Callback с ID {callback.id} уже был обработан.")
-            return
-
-            # Отмечаем callback как обработанный
-        processed_callbacks[callback.id] = True
-
-        # Отправляем уведомление через новое сообщение
-        await callback.message.answer("🚀 Начинаем повторную генерацию...")
-
-        user_id = callback.from_user.id
-        last_request_str = user_history.get_last_request(user_id)
-
-        if not last_request_str or not all(
-            key in last_request_str for key in ["qr_link", "prompt", "style", "qr_type", "transparency"]
-        ):
-            logger.error(f"Для пользователя {user_id} история запросов пуста или недостаточно данных.")
-            await callback.message.answer("❌ История запросов пуста. Сначала создайте изображение.")
-            return
-
-        logger.info(f"Восстановлены данные из истории для пользователя {user_id}: {last_request_str}")
-
-        # Обновляем состояние FSM данными из последнего запроса
-        await state.update_data(last_request_str)
-
-        # Запускаем процесс генерации изображения
-        await generate_image(callback.message, state)
-
-    except aiogram.exceptions.TelegramBadRequest as e:
-        if "query is too old" in str(e):
-            await callback.message.answer("⚠️ Этот запрос устарел. Пожалуйста, повторите действие.")
-        else:
-            logger.error(f"Ошибка при ответе на callback: {e}")
-            await callback.message.answer("❌ Произошла ошибка. Попробуйте снова.")
-
-# Обработка кнопки "Изменить параметры"
-@router.callback_query(lambda c: c.data == "change_parameters")
-async def change_parameters(callback: types.CallbackQuery, state: FSMContext):
+# Обработка кнопки "Продолжить"
+@router.callback_query(lambda c: c.data == "continue_yes")
+async def continue_process(callback: types.CallbackQuery, state: FSMContext):
     await state.set_state(Form.qr_link)
-    await callback.message.answer("Отправьте новую ссылку для QR-кода или введите /start для начала заново.")
+    await callback.message.answer("Отлично! Отправьте новую ссылку для QR-кода или введите /start для начала заново.")
     await callback.answer()
+
+# Обработка кнопки "Завершить"
+@router.callback_query(lambda c: c.data == "continue_no")
+async def stop_process(callback: types.CallbackQuery, state: FSMContext):
+    await state.clear()
+    await callback.message.answer("До встречи! Если захотите продолжить, просто отправьте /start.")
+    await callback.answer()
+
 # Запуск бота
 async def main():
     dp.include_router(router)
