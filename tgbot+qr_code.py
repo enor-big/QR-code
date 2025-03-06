@@ -20,12 +20,12 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Telegram Bot Token
-TOKEN = "8035098218:AAFk4b8XB_n2ghEUzUsQjl_MgWOf6APug0E"
+TOKEN = "Telegram token"
 
 # API Keys
 API_URL = "https://api-key.fusionbrain.ai/"
-API_KEY = "6AAC667DF487820133143F17037CBB54"
-SECRET_KEY = "7E55DE7139607DED7C9CB8FF604A3D25"
+API_KEY = "Ваш API"
+SECRET_KEY = "Ваш secret-key"
 
 # Инициализация бота и диспетчера
 bot = Bot(token=TOKEN)
